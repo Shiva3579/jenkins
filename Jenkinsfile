@@ -1,30 +1,32 @@
-@Library('devops-shared-library') _
 pipeline {
-    agent any
-    tools {
-        maven 'mymaven'
+    agent {
+        node {
+            label 'Java-project'
+        }
     }
+    tools {
+        maven "mymaven"
+    }
+
     stages {
-        stage ("CheckoutCode") {
+        stage('Code') {
             steps {
-                checkoutCode()
+                git branch: 'main', credentialsId: 'GitHub-creds', url: 'https://github.com/Shiva3579/jenkins.git'
             }
         }
-        stage ("MavenBuild") {
+        stage('Build and Test') {
             steps {
-                mavenBuild()
+               sh ("mvn clean install") 
             }
         }
-        stage ("DockerBuild") {
+        stage('Artifacts') {
             steps {
-                dockerBuild('shaikmustafa/jenkins-shared', "${BUILD_NUMBER}")
+              nexusArtifactUploader artifacts: [[artifactId: 'myweb', classifier: '', file: 'target/myweb.war', type: 'war']], credentialsId: 'Nexus', groupId: 'in.javahome', nexusUrl: '54.86.77.96:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'java-project', version: '8.8.5'  
             }
         }
-        stage ("DockerPush") {
+        stage('Deploy') {
             steps {
-                script {
-                    dockerPush('shaikmustafa/jenkins-shared', "${BUILD_NUMBER}")
-                }
+                deploy adapters: [tomcat9(alternativeDeploymentContext: '', credentialsId: 'tomcat-deploy', path: '', url: 'http://32.198.9.173:8080/')], contextPath: 'e-comm', war: 'target/*.war'
             }
         }
     }
