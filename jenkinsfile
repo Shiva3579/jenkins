@@ -1,33 +1,56 @@
 pipeline {
-    agent {
-        node {
-            label 'Java-project'
-        }
-    }
+    agent any
     tools {
         maven "mymaven"
     }
-
     stages {
-        stage('Code') {
+        stage ("Code") {
             steps {
-                git branch: 'main', credentialsId: 'GitHub-creds', url: 'https://github.com/Shiva3579/jenkins.git'
+                git branch: 'main', url: 'https://github.com/Shiva3579/jenkins.git'
             }
         }
-        stage('Build and Test') {
+        stage ("Build & Test") {
             steps {
-               sh ("mvn clean install") 
+                sh "mvn clean install"
             }
         }
-        stage('Artifacts') {
+        stage ("CAQ") {
             steps {
-              nexusArtifactUploader artifacts: [[artifactId: 'myweb', classifier: '', file: 'target/myweb.war', type: 'war']], credentialsId: 'Nexus', groupId: 'in.javahome', nexusUrl: '54.86.77.96:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'java-project', version: '8.8.5'  
+                withSonarQubeEnv('Sonar') {
+                    sh '''
+                         mvn clean verify \
+                         org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+                        -Dsonar.projectKey=javaproject \
+                        -Dsonar.host.url=http://52.201.18.167:9000 \
+                        -Dsonar.login=ff9fa85d082ece5f0a07d407c97f7c03fa6a0dff
+                        '''
+                }
             }
         }
-        stage('Deploy') {
+        stage ("QualityGates") {
             steps {
-                deploy adapters: [tomcat9(alternativeDeploymentContext: '', credentialsId: 'tomcat-deploy', path: '', url: 'http://32.198.9.173:8080/')], contextPath: 'e-comm', war: 'target/*.war'
+                waitForQualityGate abortPipeline: true, credentialsId: 'Sonar'
             }
         }
+        stage ("Artifacts") {
+            steps {
+                nexusArtifactUploader artifacts: [[artifactId: 'myweb', classifier: '', file: 'target/myweb.war', type: 'war']], credentialsId: 'Nexus', groupId: 'in.javahome', nexusUrl: '54.167.16.186:8081/', nexusVersion: 'nexus3', protocol: 'http', repository: 'Myproject', version: '8.8.5'
+            }
+        }
+        stage ("Deploy") {
+            input {
+                    message "can i deploy to prod?"
+                }
+            steps {
+                deploy adapters: [tomcat9(alternativeDeploymentContext: '', credentialsId: 'Tomcat', path: '', url: 'http://100.58.117.141:8080/')], contextPath: 'myjavaapp', war: 'target/*.war'
+            }
+        }
+    }
+    post {
+        always {
+            mail to: 'sivaiah.yenumula1@gmail.com',
+            subject: "Build Status: ${currentBuild.fullDisplayName}",
+            body: "The build ${env.BUILD_NUMBER} finished with status: ${currentBuild.currentResult}. View logs at: ${env.BUILD_URL}"
+          }
     }
 }
