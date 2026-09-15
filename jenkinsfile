@@ -6,7 +6,7 @@ pipeline {
     stages {
         stage ("Code") {
             steps {
-                git branch: 'main', url: 'https://github.com/Shiva3579/jenkins.git'
+                git branch: 'main', credentialsId: 'Github-creds', url: 'https://github.com/Shiva3579/jenkins.git'
             }
         }
         stage ("Build & Test") {
